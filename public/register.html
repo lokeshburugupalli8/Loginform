@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Register</h1>
+      <div id="errorMsg" class="error"></div>
+      <form id="registerForm" method="post" action="/register">
+        <label>Username</label>
+        <input type="text" id="username" name="username" required minlength="3" maxlength="30" />
+        <label>Email</label>
+        <input type="email" id="email" name="email" required />
+        <label>Password</label>
+        <input type="password" id="password" name="password" required minlength="8" />
+        <p style="font-size:0.85rem;color:#4b5563;">Password: 8+ chars, uppercase, lowercase, number, special char.</p>
+        <button type="submit">Register</button>
+      </form>
+      <p class="tiny">Already registered? <a href="/login">Login here</a>.</p>
+      <script>
+        const query = new URLSearchParams(window.location.search);
+        const serverError = query.get('error');
+        const serverSuccess = query.get('success');
+        const errorDiv = document.getElementById('errorMsg');
+        if (serverError) { errorDiv.textContent = serverError; }
+        if (serverSuccess) { errorDiv.style.color = '#16a34a'; errorDiv.textContent = serverSuccess; }
+
+        document.getElementById('registerForm').addEventListener('submit', (e) => {
+          const uname = document.getElementById('username').value.trim();
+          const email = document.getElementById('email').value.trim();
+          const pass = document.getElementById('password').value;
+          const usernameRe = /^[a-zA-Z0-9_ ]{3,30}$/;
+          const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          const passRe = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+          let msg = '';
+          if (!usernameRe.test(uname)) msg = 'Username 3-30 chars (letters, numbers, space, underscore).';
+          else if (!emailRe.test(email) || !email.includes('.')) msg = 'Please enter a valid email.';
+          else if (!passRe.test(pass)) msg = 'Password must be 8+ chars with upper/lower/number/special';
+          if (msg) {
+            e.preventDefault();
+            errorDiv.style.color = '#dc2626';
+            errorDiv.textContent = msg;
+          }
+        });
+      </script>
+    </div>
+  </div>
+</body>
+</html>
