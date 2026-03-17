@@ -1,19 +1,22 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const path = require('path');
+const { Low } = require('lowdb')
+const { JSONFile } = require('lowdb/node')
 
 const app = express();
-const dbFile = path.join(__dirname, 'users.db');
+const dbFile = path.join(__dirname, 'users.json');
+const adapter = new JSONFile(dbFile);
+const db = new Low(adapter, { users: [] }); // ✅
 
-const db = new sqlite3.Database(dbFile, (err) => {
-  if (err) {
-    console.error('Could not open database', err);
-    process.exit(1);
-  }
-  console.log('Connected to SQLite database:', dbFile);
-});
+async function initDb() {
+  await db.read();
+  db.data = db.data || { users: [] };
+  await db.write();
+}
+
+initDb();
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -26,15 +29,6 @@ app.use(
   })
 );
 
-// Create users table
-db.run(
-  `CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    email TEXT UNIQUE,
-    password TEXT
-  )`
-);
 
 app.get('/', (req, res) => {
   if (req.session.user) {
@@ -53,7 +47,7 @@ app.get('/login', (req, res) => {
 
 app.post('/register', async (req, res) => {
   const { username, email, password } = req.body;
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailRegex = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
   const usernameRegex = /^[a-zA-Z0-9_ ]{3,30}$/;
   const passwordRegex = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
@@ -72,21 +66,19 @@ app.post('/register', async (req, res) => {
   }
 
   const hashed = await bcrypt.hash(password, 10);
-  db.run(
-    'INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-    [cleanName, email.toLowerCase(), hashed],
-    function (err) {
-      if (err) {
-        console.error(err);
-        return res.redirect('/register?error=User or email already exists');
-      }
-      req.session.user = { id: this.lastID, username: cleanName, email: email.toLowerCase() };
-      return res.redirect('/dashboard?success=Registration successful');
-    }
-  );
+  await db.read();
+  const exists = db.data.users.find((u) => u.username === cleanName || u.email === email.toLowerCase());
+  if (exists) {
+    return res.redirect('/register?error=User or email already exists');
+  }
+  const newUser = { id: Date.now(), username: cleanName, email: email.toLowerCase(), password: hashed };
+  db.data.users.push(newUser);
+  await db.write();
+  req.session.user = { id: newUser.id, username: cleanName, email: email.toLowerCase() };
+  return res.redirect('/dashboard?success=Registration successful');
 });
 
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
   const { email, password } = req.body;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -97,21 +89,17 @@ app.post('/login', (req, res) => {
     return res.redirect('/login?error=Please enter a valid email address');
   }
 
-  db.get('SELECT * FROM users WHERE email = ?', [email.toLowerCase()], async (err, row) => {
-    if (err) {
-      console.error(err);
-      return res.redirect('/login?error=Server error');
-    }
-    if (!row) {
-      return res.redirect('/login?error=Invalid email or password');
-    }
-    const match = await bcrypt.compare(password, row.password);
-    if (!match) {
-      return res.redirect('/login?error=Invalid email or password');
-    }
-    req.session.user = { id: row.id, username: row.username, email: row.email };
-    return res.redirect('/dashboard?success=Login successful');
-  });
+  await db.read();
+  const row = db.data.users.find((u) => u.email === email.toLowerCase());
+  if (!row) {
+    return res.redirect('/login?error=Invalid email or password');
+  }
+  const match = await bcrypt.compare(password, row.password);
+  if (!match) {
+    return res.redirect('/login?error=Invalid email or password');
+  }
+  req.session.user = { id: row.id, username: row.username, email: row.email };
+  return res.redirect('/dashboard?success=Login successful');
 });
 
 app.get('/dashboard', (req, res) => {

@@ -1,0 +1,16 @@
+{
+  "users": [
+    {
+      "id": 1773748078229,
+      "username": "Narayana",
+      "email": "narayana@gmail.com",
+      "password": "$2b$10$0M.C1e9ULaA/9KI9eHqiG.rhLF0gQ6lGOVm5OL3VYm4LM.xl111vS"
+    },
+    {
+      "id": 1773748263743,
+      "username": "Lokesh",
+      "email": "lokesh@gmail.com",
+      "password": "$2b$10$t1tJQisntaeonhTiLC2d5.yxAHW/ysoxSyT2sG5O87CDGNH0rIz9C"
+    }
+  ]
+}
